@@ -14,26 +14,20 @@ import { Button } from "@/components/ui/button";
 import { ChevronLeft, ChevronRight, X, Play, HelpCircle } from "lucide-react";
 
 export function ContinueWatching() {
-  const [history, setHistory] = useState<WatchHistoryItem[]>([]);
-  const [isVisible, setIsVisible] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [history, setHistory] = useState<WatchHistoryItem[]>(() =>
+    typeof window === "undefined" ? [] : getWatchHistory(),
+  );
+  const [isExpanded, setIsExpanded] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const savedState = localStorage.getItem(
+      "aniways-continue-watching-expanded",
+    );
+    return savedState === null ? true : savedState === "true";
+  });
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
   const { language } = useLanguage();
-
-  useEffect(() => {
-    const items = getWatchHistory();
-    setHistory(items);
-    setIsVisible(items.length > 0);
-    // Load expanded state from localStorage
-    const savedState = localStorage.getItem(
-      "aniways-continue-watching-expanded",
-    );
-    if (savedState !== null) {
-      setIsExpanded(savedState === "true");
-    }
-  }, []);
 
   const toggleExpanded = () => {
     const newState = !isExpanded;
@@ -100,7 +94,7 @@ export function ContinueWatching() {
     return item.animeTitle;
   };
 
-  if (!isVisible || history.length === 0) {
+  if (history.length === 0) {
     return null;
   }
 

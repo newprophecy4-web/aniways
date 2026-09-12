@@ -1,11 +1,11 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 import bcrypt
 from jose import JWTError, jwt
 from pydantic import BaseModel
 
-# Secret key for JWT - in production, use environment variable
-SECRET_KEY = "aniways-secret-key-change-in-production-2026"
+SECRET_KEY = os.getenv("SECRET_KEY", "")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_DAYS = 30  # Long-lived token for desktop app
 
@@ -38,6 +38,8 @@ def get_password_hash(password: str) -> str:
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """Create a JWT access token"""
+    if not SECRET_KEY:
+        raise RuntimeError("SECRET_KEY is not configured")
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
@@ -50,6 +52,8 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 
 def decode_access_token(token: str) -> Optional[TokenData]:
     """Decode and validate a JWT token"""
+    if not SECRET_KEY:
+        return None
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str = payload.get("sub")

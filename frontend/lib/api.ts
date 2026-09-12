@@ -13,9 +13,22 @@ export type { Anime, WatchResponse, AnimeEpisodesResponse, LatestRelease, Episod
 export type { Episode, VideoSource } from "@/types";
 
 // Retry configuration for API calls
-const MAX_RETRIES = 5;
 const INITIAL_RETRY_DELAY = 1000; // 1 second
 const MAX_RETRY_DELAY = 10000; // 10 seconds
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly providerStatus?: number;
+
+  constructor(message: string, status: number, code?: string, providerStatus?: number) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.providerStatus = providerStatus;
+  }
+}
 
 async function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -23,16 +36,29 @@ async function sleep(ms: number): Promise<void> {
 
 async function fetchWithRetry<T>(
   url: string,
-  retries = MAX_RETRIES,
+  retries = 2,
   delay = INITIAL_RETRY_DELAY
 ): Promise<T> {
   try {
     const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`API error: ${res.status}`);
+    if (!res.ok) {
+      let payload: { detail?: string; error?: string; provider_status?: number } = {};
+      try {
+        payload = await res.json();
+      } catch {
+        // Preserve the HTTP status when the server sends no JSON body.
+      }
+      throw new ApiError(
+        payload.detail || `API request failed (${res.status})`,
+        res.status,
+        payload.error,
+        payload.provider_status,
+      );
+    }
     return res.json();
   } catch (error) {
     // Check if it's a network error (backend not ready) and we have retries left
-    if (retries > 0 && (error instanceof TypeError || (error instanceof Error && error.message.includes("fetch")))) {
+    if (retries > 0 && error instanceof TypeError) {
       console.log(`API not ready, retrying in ${delay}ms... (${retries} retries left)`);
       await sleep(delay);
       // Exponential backoff with max delay cap

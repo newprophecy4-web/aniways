@@ -22,6 +22,7 @@ class Settings:
     VIDEO_PROVIDER: str = field(default_factory=lambda: _env("VIDEO_PROVIDER", "none"))
     VIDEO_API_URL: str = field(default_factory=lambda: _env("VIDEO_API_URL", ""))
     VIDEO_API_KEY: str = field(default_factory=lambda: _env("VIDEO_API_KEY", ""))
+    CORS_ORIGINS: str = field(default_factory=lambda: _env("CORS_ORIGINS", ""))
     JIKAN_RATE_LIMIT_DELAY: float = 0.4
     JIKAN_MAX_RETRIES: int = 3
     CACHE_TTL_SHORT: int = 300
@@ -30,6 +31,11 @@ class Settings:
     DATA_DIR: str = field(default_factory=lambda: _env("DATA_DIR", "backend"))
     SECRET_KEY: str = field(default_factory=lambda: _env("SECRET_KEY", secrets.token_urlsafe(32)))
     USER_AGENT: str = field(default_factory=lambda: _env("USER_AGENT", "Aniways/2.0 (+authorized-provider-integration)"))
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Return configured browser origins, ignoring empty entries."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
 
 @lru_cache(maxsize=1)

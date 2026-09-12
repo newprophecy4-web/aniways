@@ -10,6 +10,8 @@ import logging
 import time
 from typing import Any
 
+import httpx
+
 from app.core.config import settings
 from app.core.dependencies import get_client
 from app.utils import cache
@@ -19,6 +21,16 @@ logger = logging.getLogger(__name__)
 # Rate limiting state
 _last_request = 0.0
 _rate_lock = asyncio.Lock()
+
+
+class MetadataProviderError(Exception):
+    """A safe, user-facing failure from the anime metadata provider."""
+
+    def __init__(self, message: str, status_code: int, provider_status: int | None = None):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.provider_status = provider_status
 
 
 # =============================================================================
@@ -54,12 +66,35 @@ async def _request(endpoint: str, params: dict | None = None) -> dict | None:
             resp.raise_for_status()
             return resp.json()
 
+        except httpx.TimeoutException as e:
+            logger.warning("Jikan timeout (attempt %d): %s", attempt + 1, e)
+            if attempt == settings.JIKAN_MAX_RETRIES - 1:
+                raise MetadataProviderError("Anime metadata provider timed out", 504) from e
+            await asyncio.sleep(0.5 * (2 ** attempt))
+        except httpx.HTTPStatusError as e:
+            provider_status = e.response.status_code
+            logger.warning("Jikan HTTP error (attempt %d): %s", attempt + 1, e)
+            if provider_status == 429:
+                raise MetadataProviderError("Anime metadata provider rate limited the request", 429, provider_status) from e
+            if provider_status < 500:
+                raise MetadataProviderError("Anime metadata provider rejected the request", 502, provider_status) from e
+            if attempt == settings.JIKAN_MAX_RETRIES - 1:
+                status_code = 504 if provider_status == 504 else 503
+                raise MetadataProviderError("Anime metadata provider is unavailable", status_code, provider_status) from e
+            await asyncio.sleep(0.5 * (2 ** attempt))
+        except httpx.RequestError as e:
+            logger.warning("Jikan connection error (attempt %d): %s", attempt + 1, e)
+            if attempt == settings.JIKAN_MAX_RETRIES - 1:
+                raise MetadataProviderError("Unable to reach anime metadata provider", 503) from e
+            await asyncio.sleep(0.5 * (2 ** attempt))
         except Exception as e:
             logger.warning("Jikan error (attempt %d): %s", attempt + 1, e)
             if attempt < settings.JIKAN_MAX_RETRIES - 1:
-                await asyncio.sleep(0.5 * (attempt + 1))
+                await asyncio.sleep(0.5 * (2 ** attempt))
+            else:
+                raise MetadataProviderError("Anime metadata provider returned an invalid response", 502) from e
 
-    return None
+    raise MetadataProviderError("Anime metadata provider is unavailable", 503)
 
 
 def _normalize(anime: dict) -> dict:
@@ -139,7 +174,7 @@ async def scrape_top_anime(
 
     result = await _request("/top/anime", params)
     if not result or "data" not in result:
-        return _empty_page()
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     response = {
         "data": [_normalize(a) for a in result["data"][:limit]],
@@ -160,7 +195,7 @@ async def scrape_anime_details(mal_id: int) -> dict | None:
 
     result = await _request(f"/anime/{mal_id}/full")
     if not result or "data" not in result:
-        return None
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     anime = _normalize(result["data"])
     cache.set(key, anime)
@@ -190,7 +225,7 @@ async def browse_anime(
 
     result = await _request("/anime", params)
     if not result or "data" not in result:
-        return _empty_page()
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     response = {
         "data": [_normalize(a) for a in result["data"]],
@@ -211,7 +246,7 @@ async def search_anime(query: str, page: int = 1, limit: int = 25) -> tuple[list
 
     result = await _request("/anime", {"q": query, "page": page, "limit": min(limit, 25), "sfw": "false"})
     if not result or "data" not in result:
-        return [], 1
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     response = (
         [_normalize(a) for a in result["data"]],
@@ -235,7 +270,7 @@ async def scrape_seasonal_anime(
 
     result = await _request(endpoint, {"limit": min(limit, 25)})
     if not result or "data" not in result:
-        return []
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     anime_list = [_normalize(a) for a in result["data"][:limit]]
     cache.set(key, anime_list)
@@ -250,7 +285,7 @@ async def scrape_upcoming_anime(limit: int = 25) -> list[dict]:
 
     result = await _request("/seasons/upcoming", {"limit": min(limit, 25)})
     if not result or "data" not in result:
-        return []
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     anime_list = [_normalize(a) for a in result["data"][:limit]]
     cache.set(key, anime_list)
@@ -269,7 +304,7 @@ async def scrape_schedule(day: str | None = None, page: int = 1) -> list[dict]:
 
     result = await _request("/schedules", params)
     if not result or "data" not in result:
-        return []
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     anime_list = [_normalize(a) for a in result["data"]]
     cache.set(key, anime_list)
@@ -340,7 +375,7 @@ async def scrape_recommendations(mal_id: int, limit: int = 12) -> list[dict]:
 
     result = await _request(f"/anime/{mal_id}/recommendations")
     if not result or "data" not in result:
-        return []
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     recs = [
         {
@@ -365,7 +400,7 @@ async def scrape_characters(mal_id: int, limit: int = 12) -> list[dict]:
 
     result = await _request(f"/anime/{mal_id}/characters")
     if not result or "data" not in result:
-        return []
+        raise MetadataProviderError("Anime metadata provider returned an invalid response", 502)
 
     characters = []
     for char in result["data"][:limit]:

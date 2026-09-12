@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
-import { api, type Anime } from "@/lib/api";
+import { api, ApiError, type Anime } from "@/lib/api";
 import { AnimeGrid, AnimeGridSkeleton } from "@/components/anime-grid";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ function SearchContent() {
   const [page, setPage] = useState(1);
   const [hasNextPage, setHasNextPage] = useState(false);
   const [totalPages, setTotalPages] = useState(1);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     document.title = query ? `Search: ${query} - Aniways` : "Search - Aniways";
@@ -34,6 +35,7 @@ function SearchContent() {
     if (!q.trim()) return;
 
     setLoading(true);
+    setError(null);
     try {
       const res = await api.searchAnime(q, pageNum);
       setResults(res.data || []);
@@ -42,6 +44,13 @@ function SearchContent() {
     } catch (error) {
       console.error("Search failed:", error);
       setResults([]);
+      if (error instanceof ApiError && error.status >= 502 && error.status <= 504) {
+        setError("Anime metadata is temporarily unavailable. Please try again shortly.");
+      } else if (error instanceof ApiError && error.status === 429) {
+        setError("Too many requests. Please wait a moment and try again.");
+      } else {
+        setError("The backend could not be reached. Please try again shortly.");
+      }
     } finally {
       setLoading(false);
     }
@@ -101,6 +110,10 @@ function SearchContent() {
             </div>
           )}
         </>
+      ) : error ? (
+        <div className="text-center py-12">
+          <p className="text-destructive text-lg">{error}</p>
+        </div>
       ) : query ? (
         <div className="text-center py-12">
           <p className="text-muted-foreground text-lg">

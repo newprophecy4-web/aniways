@@ -21,6 +21,7 @@ from app.routes import animepahe, watch, mal
 from app.routes import auth as auth_routes
 from app.routes import animelist as list_routes
 from app.database import engine, Base
+from app.scrapers.jikan import MetadataProviderError
 
 # Logging
 logging.basicConfig(
@@ -63,11 +64,22 @@ def create_app() -> FastAPI:
     # CORS
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
+        allow_origins=settings.cors_origins,
+        allow_credentials=bool(settings.cors_origins),
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    @app.exception_handler(MetadataProviderError)
+    async def metadata_provider_error_handler(request: Request, exc: MetadataProviderError):
+        return JSONResponse(
+            status_code=exc.status_code,
+            content={
+                "error": "metadata_provider_unavailable",
+                "detail": exc.message,
+                "provider_status": exc.provider_status,
+            },
+        )
 
     # Global error handler
     @app.exception_handler(Exception)

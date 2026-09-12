@@ -7,18 +7,19 @@ import { Button } from "@/components/ui/button";
 const THEME_KEY = "theme";
 
 export function ThemeToggle() {
-  const [dark, setDark] = useState(true);
+  const [dark, setDark] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return localStorage.getItem(THEME_KEY) !== "light";
+  });
 
   useEffect(() => {
     // Load theme from localStorage on mount
     const savedTheme = localStorage.getItem(THEME_KEY);
     if (savedTheme) {
       const isDark = savedTheme === "dark";
-      setDark(isDark);
       document.documentElement.classList.toggle("dark", isDark);
     } else {
       // Default to dark theme
-      setDark(true);
       document.documentElement.classList.add("dark");
     }
   }, []);

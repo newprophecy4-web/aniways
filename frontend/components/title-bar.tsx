@@ -13,7 +13,9 @@ import {
 } from "lucide-react";
 
 export function TitleBar() {
-  const [isElectron, setIsElectron] = useState(false);
+  const [isElectron] = useState(() =>
+    typeof window !== "undefined" && Boolean(window.electronAPI?.isElectron),
+  );
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
@@ -21,8 +23,6 @@ export function TitleBar() {
 
   useEffect(() => {
     if (typeof window !== "undefined" && window.electronAPI?.isElectron) {
-      setIsElectron(true);
-
       // Add class to enable electron-specific styles
       document.documentElement.classList.add("electron");
 

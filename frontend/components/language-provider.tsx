@@ -3,7 +3,6 @@
 import {
   createContext,
   useContext,
-  useEffect,
   useState,
   useCallback,
 } from "react";
@@ -33,16 +32,11 @@ const LanguageContext = createContext<LanguageContextType | undefined>(
 );
 
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
-  const [language, setLanguage] = useState<Language>("en");
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const stored = localStorage.getItem("language") as Language;
-    if (stored === "en" || stored === "jp") {
-      setLanguage(stored);
-    }
-  }, []);
+  const [language, setLanguage] = useState<Language>(() => {
+    if (typeof window === "undefined") return "en";
+    const stored = localStorage.getItem("language");
+    return stored === "jp" ? "jp" : "en";
+  });
 
   const handleSetLanguage = (lang: Language) => {
     setLanguage(lang);
