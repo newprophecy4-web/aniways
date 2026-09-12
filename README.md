@@ -40,11 +40,11 @@ This project is for educational and personal use only.
 
 ## Overview
 
-Aniways provides anime metadata from MyAnimeList (via Jikan API) and video sources from Animepahe. The backend handles data fetching, caching, and video URL extraction while the frontend delivers a responsive viewing experience.
+Aniways provides anime metadata from MyAnimeList (via Jikan API). The backend handles data fetching, caching, authentication, and user lists while the frontend delivers a responsive viewing experience. Playback is isolated behind an authorized-provider interface and remains unavailable until an approved provider is configured.
 
 ### Features
 
-- **Stream Anime** - Watch from Animepahe sources with quality selection
+- **Playback adapter** - Quality-aware playback when an authorized provider is configured
 - **Anime Lists** - Track your anime (Plan to Watch, Watching, Completed, Paused, Dropped)
 - **User Accounts** - Register and login with JWT authentication
 - **Continue Watching** - Resume from where you left off
@@ -94,7 +94,7 @@ aniways/
 
 ## Backend
 
-FastAPI server providing anime data and video sources.
+FastAPI server providing anime data, authentication, and user lists. Playback routes return HTTP 503 until an authorized provider is configured.
 
 ### Requirements
 
@@ -147,13 +147,9 @@ Server runs at `http://localhost:4444`
 | GET /api/list                       | Get user's anime list                 |
 | POST /api/list                      | Add anime to list                     |
 
-### DDoS-Guard Cookies
+### Playback provider
 
-Animepahe requires DDoS-Guard bypass cookies. To update:
-
-1. Visit animepahe.si in browser
-2. Open DevTools > Application > Cookies
-3. POST cookies to `/api/animepahe/cookies`
+The default deployment deliberately does not configure a video provider. It does not bypass DDoS protection, CAPTCHA, Cloudflare, anti-bot controls, Referer or Origin protection, IP restrictions, rate limits, authentication, or DRM. Configure only a documented and authorized provider adapter through environment variables.
 
 ---
 
@@ -221,7 +217,7 @@ npm start
 - TypeScript - Type safety
 - Tailwind CSS 4 - Styling
 - shadcn/ui - UI components
-- HLS.js - Video streaming
+- HLS.js - Available for authorized HLS integrations
 
 ### Desktop App
 

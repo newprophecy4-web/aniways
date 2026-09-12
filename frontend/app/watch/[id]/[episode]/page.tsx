@@ -332,6 +332,8 @@ export default function WatchPage({ params }: WatchPageProps) {
       const errorMsg = err instanceof Error ? err.message : "";
       if (errorMsg.includes("404")) {
         setError("not_found");
+      } else if (errorMsg.includes("503")) {
+        setError("provider_unavailable");
       } else {
         setError("retry");
       }
@@ -589,6 +591,18 @@ export default function WatchPage({ params }: WatchPageProps) {
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-4">
                 <p className="text-muted-foreground text-center text-lg">
                   Episode not available
+                </p>
+                <Link href={`/anime/${id}`}>
+                  <Button variant="outline">Back to Anime</Button>
+                </Link>
+              </div>
+            ) : error === "provider_unavailable" ? (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-4">
+                <p className="text-muted-foreground text-center text-lg">
+                  Playback provider is not configured
+                </p>
+                <p className="text-muted-foreground text-center text-sm">
+                  Anime metadata and episode information remain available.
                 </p>
                 <Link href={`/anime/${id}`}>
                   <Button variant="outline">Back to Anime</Button>

@@ -1,44 +1,30 @@
-"""
-Dependency Injection
-====================
+"""Shared application dependencies."""
 
-Shared resources with lazy initialization.
-"""
-
-from typing import TYPE_CHECKING
 import httpx
 
-if TYPE_CHECKING:
-    from app.scrapers.animepahe import AnimepaheScraper
+from app.providers import UnavailableVideoProvider
 
-# Singleton instances
 _client: httpx.AsyncClient | None = None
-_scraper: "AnimepaheScraper | None" = None
+_video_provider = UnavailableVideoProvider()
 
 
 def get_client() -> httpx.AsyncClient:
-    """Get HTTP client (raises if not initialized)."""
-    if not _client:
+    if _client is None:
         raise RuntimeError("HTTP client not initialized")
     return _client
 
 
-def get_scraper() -> "AnimepaheScraper":
-    """Get Animepahe scraper (raises if not initialized)."""
-    if not _scraper:
-        raise RuntimeError("Scraper not initialized")
-    return _scraper
+def get_video_provider() -> UnavailableVideoProvider:
+    return _video_provider
 
 
-def init_dependencies(client: httpx.AsyncClient, scraper: "AnimepaheScraper") -> None:
-    """Initialize dependencies on startup."""
-    global _client, _scraper
-    _client, _scraper = client, scraper
+def init_dependencies(client: httpx.AsyncClient) -> None:
+    global _client
+    _client = client
 
 
 async def cleanup_dependencies() -> None:
-    """Cleanup on shutdown."""
-    global _client, _scraper
+    global _client
     if _client:
         await _client.aclose()
-    _client = _scraper = None
+    _client = None

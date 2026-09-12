@@ -1,5 +1,1 @@
-"""Video URL extractors."""
-
-from app.extractors.kwik import KwikExtractor
-
-__all__ = ["KwikExtractor"]
+"""Authorized media extractors are configured by a provider integration."""
